@@ -1,12 +1,15 @@
 import pyxel
+import math
 
-
+def dist(p,q):
+    return math.sqrt(sum((px - qx) ** 2.0 for px, qx in zip(p, q)))
 class App:
 
     def __init__(self):
         self.mouse_pressed = False
         self.drawing_anime = False
         self.frame_anime_init = 0
+        self.game_score = 0
         self.circ_x = 80
         self.circ_y = 80
         pyxel.init(160, 160, caption="Fried fly")
@@ -26,10 +29,15 @@ class App:
         if self.mouse_pressed and not self.drawing_anime:
             self.drawing_anime = True
             self.frame_anime_init = pyxel.frame_count
+        if self.mouse_pressed and dist([self.circ_x,self.circ_y],[80,80]) <= 5: self.game_score += 100
 
     def draw(self):
         # fill the screen with a black
         pyxel.cls(pyxel.COLOR_BLACK)
+        pyxel.blt(80, 80, 0, 0, 32, 16, 16, pyxel.COLOR_BROWN)
+        pyxel.circ(80, 80, 5, pyxel.COLOR_BROWN)
+        pyxel.text(110, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_GREEN)
+        pyxel.text(109, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_RED)
         if self.drawing_anime:
             # Count how many frames were passed from the begining
             current_frame = pyxel.frame_count - self.frame_anime_init
