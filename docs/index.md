@@ -217,20 +217,20 @@ def update(self):
         if self.mouse_pressed: ##### ここです #####
             self.circ_x = pyxel.mouse_x
             self.circ_y = pyxel.mouse_y
-    
+
     def draw(self):
         ...
         if self.mouse_pressed:
-            pyxel.circ(self.circ_x, self.circ_y, 30, pyxel.COLOR_RED)　##### ここです #####
+            pyxel.circ(self.circ_x, self.circ_y, 30, pyxel.COLOR_RED) ##### ここです #####
 ```
 
 実行した結果がこちら。マウス左ボタンは押したまま動かしています。
 
-[circ-move](./img/anime-circ-move.gif)
+![circ-move](./img/anime-circ-move.gif)
 
 良さそうですね。
 
-###　まとめ
+### まとめ
 
 それではこの記事のまとめです。
 
@@ -249,3 +249,138 @@ def update(self):
 最新版のソースコードのcommit IDは`a3a4e3d`です。
 
 (2021-07-25：公開)
+
+## ハエを叩くモーションを作る
+
+さて、前回はマウスのクリックを認識させ、カーソルの位置に円を描画してみました。
+
+今回はこれを応用して、マウスをクリックした時にだけハエを叩くアニメーションが表示されるようにしてみましょう。
+
+今回は、処理がフレームをまたぐことになるのでなるべく丁寧に解説します。
+
+さて、`pyxeledior`を使って次の様な画像を用意しました。
+
+![item1](./img/anime-item1.png)
+
+今回の目標はこの三つの画像のうち、マウスをクリックしない間は一番左を表示しておき、クリックされた際に右に移り変わっていくようなプログラムを実現します。
+
+まずは、前回の円の表示と何が違うか考えてみましょう。
+
+### フレームについて
+
+ゲームにはフレームという概念があり、一秒あたりのフレーム更新回数をFrame per second (FPS)と呼びます。
+FPSが大きくなるほどゲーム画面の更新が頻繁に行われ、見た目には滑らかなゲームになるわけですね。
+
+前回に円を表示した際には、全ての処理を同一フレーム内で完結させていました。
+言い換えると一組の`update()`と`draw()`で済んでいたわけです。
+
+単純に考えれば、マウスがクリックされた時に画像を三枚順に表示すれば良いですが、
+それだと人間にはあまりに一瞬すぎて良いアニメーションには見えません。
+
+各画像を表示する間にゲームを一時停止するという方法もありますが、その他の処理は継続したいです。
+そこで、処理を複数フレームに跨がるようにすることで、ゲームを止めずにアニメーションを表示します。
+
+具体的に実装してみましょう。
+
+まず`__init__()`と`update()`を次のように書き換えます。
+
+```python
+    def __init__(self):
+        self.mouse_pressed = False
+        self.drawing_anime = False ##### ここです #####
+        self.frame_anime_init = 0 ##### ここです #####
+        self.circ_x = 80
+        self.circ_y = 80
+        pyxel.init(160, 160, caption="Fried fly", fps=30)
+        pyxel.load('friedfly.pyxres') ##### ここです #####
+        pyxel.run(self.update, self.draw)
+
+    def update(self):
+        ...
+        pyxel.mouse(True)
+        # check if a mouse is pressed
+        self.mouse_pressed = pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON)
+        ##### ここから #####
+        self.circ_x = pyxel.mouse_x
+        self.circ_y = pyxel.mouse_y
+        if self.mouse_pressed and not self.drawing_anime:
+            self.drawing_anime = True
+            self.frame_anime_init = pyxel.frame_count
+```
+`__init__()` には今回の処理で必要な値の初期宣言をいています。
+
+重要な役割を果たすのは`if self.mouse_pressed and not self.drawing_anime:`から始まるif文です。
+
+このif文により、ハエ叩きアニメーション（以下、叩きアニメ）の表示が進行中でない場合かつマウスがクリックされた時にだけ、
+叩きアニメを開始するようにしています。
+if文の条件に`not self.drawing_anime`があるのは、叩きアニメ表示中に再度`not self.drawing_anime`を書き換えられないようにするためです。
+
+さらに、クリックしていない時でもハエ叩きをカーソルの位置に表示し続けたいので、`circ_x`と`circ_y`はif文の外に出ていることに注意してください。
+`self.frame_anime_init`はアニメーション終了のタイミングを決めるため、叩きアニメ開始のタイミングを保存しています。
+
+以上で追加した`self.drawing_anime`と`self.frame_anime_init`を用いて、叩きアニメを描画する処理を実現しましょう。
+
+具体的には
+
+`self.drawing_anime = True`になる -> アニメーションを一定時間表示する -> `self.drawing_anime = False`に戻す
+
+ということができれば良いわけです。加えて、`self.drawing_anime = False`の時には動いていないハエ叩きが表示されるようにしましょう。
+
+これを`draw()`に追加してみると次のようになります。
+
+```python
+    def draw(self):
+        pyxel.cls(pyxel.COLOR_BLACK)
+        if self.drawing_anime:
+            # Count how many frames were passed from the begining
+            current_frame = pyxel.frame_count - self.frame_anime_init
+            # First four frames
+            if current_frame//4 == 0: pyxel.blt(self.circ_x, self.circ_y, 0, 16, 0, 16, 32, pyxel.COLOR_BROWN)
+            # Next four frames
+            if current_frame//4 == 1: pyxel.blt(self.circ_x, self.circ_y, 0, 32, 0, 16, 32, pyxel.COLOR_BROWN)
+            # if the animation lasts more than eight frames, kill it.
+            if current_frame >= 8:
+                self.drawing_anime = False
+        else:
+            # nominal state (without a click)
+            pyxel.blt(self.circ_x, self.circ_y, 0, 0, 0, 16, 32, pyxel.COLOR_BROWN)
+
+```
+
+ここで重要なのは最初のif文です。
+ここでハエ叩きアニメを表示するべき状態なのかを判別し、通常時（`else`）は左端の画像を表示しています。
+`else`の中身は通常の状態なんだからif分の前に書いてはいけないの？と思うかもしれませんが、
+現在のコードでは毎フレームで画面を黒塗りし（`pyxel.cls(pyxel.COLOR_BLACK)`）、その後に画像を表示しているので画像が重なってしまいます。
+
+そういうわけで叩きアニメを表示する状態とそうでない状態に分ける必要があります。
+
+if文の中身を解説していきましょう。
+
+はじめに`current_frame`を定義しています。ゲームの正解ではフレーム数が時間に相当するので、フレームの数を数えることで時間の経過を取り扱えます。
+
+叩きアニメが始まってからのフレーム数をカウントしたいので、現在のフレーム`pyxel.frame_count`から`self.frame_anime_init`を引くことで
+経過時間をカウントしています。
+
+その後二行がアニメーションの核となる部分です。
+
+`//`は代数演算子のひとつで、割り算をしてその小数点以下を切り捨てた値を返します。
+
+ここでは各画像を4フレームづつ表示するとした決めました。すると最初の4フレームは真ん中の画像、後の4フレームは右の画像を表示したいわけです。
+
+そのため0から7フレームまでのうち、0,1,2,3と4,5,6,7で処理を分けたくなります。こんな時に使えるのが`//`なわけです。
+
+4未満の数字は4で割ると1未満になるので、0になり、4から7は1になるので、この条件を使って場合わけができます。
+
+それが`if current_frame//4 == 0:`と`if current_frame//4 == 1:`の部分に相当する訳ですね。
+
+最後に8フレーム以上の時間が経過した際には、`self.drawing_anime`を`False`に戻すことで、通常時の描写に戻します。
+
+これでクリックするたびにハエを叩くアニメーションが表示されるはずです。さて、動かしてみましょう。
+
+![anime-item1](./img/anime-item1.gif)
+
+いい感じですね。だんだんゲームらしくなってきました。
+
+次回はスコアを導入して、敵をクリックするとスコアが増える仕組みを考えてみたいと思います。
+
+(2021-07-28：公開)
