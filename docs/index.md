@@ -462,4 +462,52 @@ r = sqrt((x_a - x_b) * (x_a - x_b) + (y_a - y_b) * (y_a - y_b))
 
 これは点Aから点Bまでひいた直線の長さと等しくなります。
 
+この距離がある一定の値より小さい時だけ、スコアを増加させてあげれば良いわけです。
+
+それを`update()`に追加すると
+
+```python
+    def update(self):
+        ...
+            self.frame_anime_init = pyxel.frame_count
+        if self.mouse_pressed and dist([self.circ_x,self.circ_y],[80,80]) <= 5: self.game_score += 100
+```
+ここでは距離が5以下の場合に100点増える様にしました。
+
+ここで`dist`は二つの座標`[x,y]`の配列を引数にとる関数で以下のように実装しました。
+
+```python
+def dist(p,q):
+    return math.sqrt(sum((px - qx) ** 2.0 for px, qx in zip(p, q)))
+```
+少し難しい書き方をしていますが、rの定義と同じことをしています。この関数はクラス内部の情報を使わないのでクラスの外部に定義しています。
+
+正常に動くようにするために`__init__()`にgame_soreの初期化と当たり範囲（ここでは80,80から距離5以内）を
+表す円の描画を追加してあげます。
+
+```python
+    def __init__(self):
+        ...
+        self.frame_anime_init = 0
+        self.game_score = 0 ##### ここです #####
+
+    def draw(self):
+        ...
+        pyxel.cls(pyxel.COLOR_BLACK)
+        pyxel.blt(80, 80, 0, 0, 32, 16, 16, pyxel.COLOR_BROWN)
+        pyxel.circ(80, 80, 5, pyxel.COLOR_BROWN) ##### ここです #####
+        pyxel.text(110, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_GREEN)
+        pyxel.text(109, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_RED)
+```
+
+
+実行してみると、中心の茶色の円の中をクリックした時にだけ、スコアが増加することが確認できます。
+
+次回はついに敵のモーションを追加していきます。
+
+プログラムがごちゃごちゃしてきたので、一旦整理もしてみようと思います。
+
+
 (2021-07-28：諸事情により書きかけ)
+
+(2021-08-08：公開)
