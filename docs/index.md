@@ -511,3 +511,188 @@ def dist(p,q):
 (2021-07-28：諸事情により書きかけ)
 
 (2021-08-08：公開)
+
+
+## 敵の追加
+
+### 複雑化に向けた、プログラムの整理
+
+まずは、敵を実装する前にこれまで作ってきたソースコードを整理することからはじめましょう。
+
+プログラムの処理内容をそのままに改良することをリファクタリングと呼びます。
+
+これから敵の処理が増えるにつれ、コードが煩雑になっていくので一度リファクタリングを行ってみます。
+
+今回は処理の種類を`Player, Score, General`に分けた後に、改良していくこととします。
+
+コメントをつけたコードは`rough`ブランチに残しておいたので、いつでも簡単に確認できます。
+
+コメントをつけたコードを見てみましょう。
+
+```python
+def __init__(self):
+        ## Player
+        self.mouse_pressed = False
+        ## Player
+        self.drawing_anime = False
+        ## Player
+        self.frame_anime_init = 0
+        ## General
+        self.game_score = 0
+        ## Player
+        self.circ_x = 80
+        self.circ_y = 80
+        ## General
+        pyxel.init(160, 160, caption="Fried fly")
+        pyxel.load('friedfly.pyxres')
+        pyxel.run(self.update, self.draw)
+```
+`__init__()`は主に初期化処理の集まりなので今回は手を触れないこととします。
+```python
+
+    def update(self):
+        ## General
+        # quit a game when Q is pressed
+        if pyxel.btnp(pyxel.KEY_Q):
+            pyxel.quit()
+        # display the cursor
+        pyxel.mouse(True)
+        # check if a mouse is pressed
+        ## General
+        self.mouse_pressed = pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON)
+        ## Player
+        self.circ_x = pyxel.mouse_x
+        self.circ_y = pyxel.mouse_y
+        if self.mouse_pressed and not self.drawing_anime:
+            self.drawing_anime = True
+            self.frame_anime_init = pyxel.frame_count
+        ## Score
+        if self.mouse_pressed and dist([self.circ_x,self.circ_y],[80,80]) <= 5: self.game_score += 100
+```
+`update()`はこんな感じです。
+
+`self.mouse_pressed`の代入処理は`Player`ではないのかと悩みましたが、スコアの処理にも使っているので`General`と分類しました。
+これからする作業では`Player`と`Score`の間になるべく、依存関係を持たせないようにします。
+
+とりあえず難しいことは抜きにして、簡単に処理をまとめてみましょう。
+次のような関数を二つ用意します。
+```python
+    def update_player(self):
+
+    def update_score(self):
+
+```
+この内部に、コメントで区別した`update()`の処理をコピーします。
+
+```python
+    def update_player(self):
+        self.circ_x = pyxel.mouse_x
+        self.circ_y = pyxel.mouse_y
+        if self.mouse_pressed and not self.drawing_anime:
+            self.drawing_anime = True
+            self.frame_anime_init = pyxel.frame_count
+    def update_score(self):
+        if self.mouse_pressed and dist([self.circ_x,self.circ_y],[80,80]) <= 5: self.game_score += 100
+```
+
+その後に、`update()`内部の処理をこの二つの関数で置き換えます。
+
+```python
+    def update(self):
+        ## General
+        # quit a game when Q is pressed
+        if pyxel.btnp(pyxel.KEY_Q):
+            pyxel.quit()
+        # display the cursor
+        pyxel.mouse(True)
+        # check if a mouse is pressed
+        ## General
+        self.mouse_pressed = pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON)
+        ## Player
+        self.update_player()
+        ## Score
+        self.update_score()
+```
+
+これで`update()`がすっきりしました。`draw()`も同様にまとめてみるとこれが、
+
+```python
+    def draw(self):
+        # fill the screen with a black
+        ## General
+        pyxel.cls(pyxel.COLOR_BLACK)
+        pyxel.blt(80, 80, 0, 0, 32, 16, 16, pyxel.COLOR_BROWN)
+        pyxel.circ(80, 80, 5, pyxel.COLOR_BROWN)
+        pyxel.text(110, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_GREEN)
+        pyxel.text(109, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_RED)
+        if self.drawing_anime:
+            # Count how many frames were passed from the begining
+            current_frame = pyxel.frame_count - self.frame_anime_init
+            # First four frames
+            if current_frame//4 == 0: pyxel.blt(self.circ_x, self.circ_y, 0, 16, 0, 16, 32, pyxel.COLOR_BROWN)
+            # Next four frames
+            if current_frame//4 == 1: pyxel.blt(self.circ_x, self.circ_y, 0, 32, 0, 16, 32, pyxel.COLOR_BROWN)
+            # if the animation lasts more than eight frames, kill it.
+            if current_frame >= 8:
+                self.drawing_anime = False
+        else:
+            # nominal state (without a click)
+            pyxel.blt(self.circ_x, self.circ_y, 0, 0, 0, 16, 32, pyxel.COLOR_BROWN)
+
+```
+こうなります。
+
+```python
+    def draw(self):
+        # fill the screen with a black
+        ## General
+        pyxel.cls(pyxel.COLOR_BLACK)
+        self.draw_score()
+        self.draw_player()
+
+
+    def draw_player(self):
+        if self.drawing_anime:
+            # Count how many frames were passed from the begining
+            current_frame = pyxel.frame_count - self.frame_anime_init
+            # First four frames
+            if current_frame//4 == 0: pyxel.blt(self.circ_x, self.circ_y, 0, 16, 0, 16, 32, pyxel.COLOR_BROWN)
+            # Next four frames
+            if current_frame//4 == 1: pyxel.blt(self.circ_x, self.circ_y, 0, 32, 0, 16, 32, pyxel.COLOR_BROWN)
+            # if the animation lasts more than eight frames, kill it.
+            if current_frame >= 8:
+                self.drawing_anime = False
+        else:
+            # nominal state (without a click)
+            pyxel.blt(self.circ_x, self.circ_y, 0, 0, 0, 16, 32, pyxel.COLOR_BROWN)
+
+    def draw_score(self):
+        ## Score
+        pyxel.blt(80, 80, 0, 0, 32, 16, 16, pyxel.COLOR_BROWN)
+        pyxel.circ(80, 80, 5, pyxel.COLOR_BROWN)
+        pyxel.text(110, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_GREEN)
+        pyxel.text(109, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_RED)
+```
+
+さて、このような作業をしてもプログラムの動作は変わらないはずです。
+では、この作業の利点はどこにあるのでしょう。
+
+自分が思う利点は大きく分けて以下の通りです。
+1. コードが読みやすくなる。
+2. 変更作業が楽になる。
+コードの読みやすさに関しては、書き手と読み手のレベルにも依存しますが、例えば主人公の処理に関する部分だけを確認したい時、（バグが明らかにその処理にあるとわかっているとき）
+変更前のコードだと、一読して主人公に関する処理を理解してから変更しなければいけないですが、変更後では`update_player`の中身を読めば良いことがわかります。
+
+今はまだ小さなコードですが、今後機能が増えていくとこのありがたみがわかると思います。
+
+次に変更作業についてですが、これは実際に手を動かしてみるのが良いです。
+例えば`draw()`の中身の`draw_player()`だけをコメントアウトしてみましょう。draw_playerの中身は処理だけで8行に渡るものですが、`draw_palyer()`の一行をコメントアウトしただけで、ハエ叩きが表示されなくなるのが
+わかるかと思います。しかしそれ以外の部分は正常に動作していますね。
+
+このようなことは、プログラムの誤った変更を防ぐことにも繋がります。
+
+あとはこれから敵を導入していくと、複数体の敵を表示したいということになると思います。
+
+そういった時に少し入力の異なる同じ処理を繰り返す時などは関数としてまとめる利点が明らかになるかと思います。乞うご期待。
+
+(2021-08-09：公開)

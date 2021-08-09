@@ -32,25 +32,28 @@ class App:
         # check if a mouse is pressed
         ## General
         self.mouse_pressed = pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON)
-        ## Player
+        self.update_player()
+        self.update_score()
+
+    def update_player(self):
         self.circ_x = pyxel.mouse_x
         self.circ_y = pyxel.mouse_y
         if self.mouse_pressed and not self.drawing_anime:
             self.drawing_anime = True
             self.frame_anime_init = pyxel.frame_count
-        ## Score
+
+    def update_score(self):
         if self.mouse_pressed and dist([self.circ_x,self.circ_y],[80,80]) <= 5: self.game_score += 100
 
     def draw(self):
         # fill the screen with a black
         ## General
         pyxel.cls(pyxel.COLOR_BLACK)
-        ## Score
-        pyxel.blt(80, 80, 0, 0, 32, 16, 16, pyxel.COLOR_BROWN)
-        pyxel.circ(80, 80, 5, pyxel.COLOR_BROWN)
-        pyxel.text(110, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_GREEN)
-        pyxel.text(109, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_RED)
-        ## Player
+        self.draw_score()
+        self.draw_player()
+
+
+    def draw_player(self):
         if self.drawing_anime:
             # Count how many frames were passed from the begining
             current_frame = pyxel.frame_count - self.frame_anime_init
@@ -65,5 +68,11 @@ class App:
             # nominal state (without a click)
             pyxel.blt(self.circ_x, self.circ_y, 0, 0, 0, 16, 32, pyxel.COLOR_BROWN)
 
+    def draw_score(self):
+        ## Score
+        pyxel.blt(80, 80, 0, 0, 32, 16, 16, pyxel.COLOR_BROWN)
+        pyxel.circ(80, 80, 5, pyxel.COLOR_BROWN)
+        pyxel.text(110, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_GREEN)
+        pyxel.text(109, 5, 'SCORE: {}'.format(self.game_score), pyxel.COLOR_RED)
 
 App()
